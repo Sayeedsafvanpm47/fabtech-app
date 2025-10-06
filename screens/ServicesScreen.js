@@ -80,16 +80,17 @@ export default function ServicesScreen({ navigation }) {
   );
 
   const handleServicePress = (service) => {
-    navigation.navigate('ServiceDetail', { service });
+    // navigation.navigate('ServiceDetail', { service });
+    console.log('Service pressed:', service.title);
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Book Mark</Text>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logo}>⚙️</Text>
+          <View>
+            <Text style={styles.title}>Services</Text>
+            <Text style={styles.subtitle}>Browse our manufacturing services</Text>
           </View>
           <View style={styles.profileIcon}>
             <Text style={styles.profileIconText}>JD</Text>
@@ -100,7 +101,7 @@ export default function ServicesScreen({ navigation }) {
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Service, Search here"
+              placeholder="Search services..."
               placeholderTextColor="#9CA3AF"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -110,28 +111,73 @@ export default function ServicesScreen({ navigation }) {
       </View>
       
       <View style={styles.content}>
+        <Text style={styles.sectionTitle}>
+          {searchQuery ? 'Search Results' : 'Available Services'} ({filteredServices.length})
+        </Text>
+        
         {filteredServices.map((service) => (
-          <TouchableOpacity key={service.id} style={styles.serviceCard} onPress={() => handleServicePress(service)}>
+          <TouchableOpacity 
+            key={service.id} 
+            style={styles.serviceCard} 
+            onPress={() => handleServicePress(service)}
+            activeOpacity={0.7}
+          >
             <View style={styles.serviceImageContainer}>
               <Text style={styles.serviceIcon}>{service.image}</Text>
-              <View style={styles.heartIcon}>
-                <Text style={styles.heartText}>❤️</Text>
-              </View>
             </View>
+            
             <View style={styles.serviceContent}>
-              <Text style={styles.serviceTitle}>{service.title}</Text>
-              <Text style={styles.serviceLocation}>{service.category} • {service.duration}</Text>
-              <Text style={styles.serviceDetails}>-2 persons</Text>
-              <Text style={styles.serviceDetails}>-1 Deluxe Service</Text>
-              <View style={styles.serviceFooter}>
-                <TouchableOpacity style={styles.priceButton}>
-                  <Text style={styles.priceText}>{service.price}</Text>
+              <View style={styles.serviceHeader}>
+                <View style={styles.serviceTitleContainer}>
+                  <Text style={styles.serviceTitle}>{service.title}</Text>
+                  <View style={styles.categoryBadge}>
+                    <Text style={styles.categoryText}>{service.category}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.favoriteButton}>
+                  <Text style={styles.favoriteIcon}>❤️</Text>
                 </TouchableOpacity>
-                <Text style={styles.rating}>Rating {service.rating}</Text>
+              </View>
+              
+              <Text style={styles.serviceDescription} numberOfLines={2}>
+                {service.description}
+              </Text>
+              
+              <View style={styles.serviceMetadata}>
+                <View style={styles.metadataItem}>
+                  <Text style={styles.metadataIcon}>⏱️</Text>
+                  <Text style={styles.metadataText}>{service.duration}</Text>
+                </View>
+                <View style={styles.metadataItem}>
+                  <Text style={styles.metadataIcon}>⭐</Text>
+                  <Text style={styles.metadataText}>
+                    {service.rating} ({service.reviews})
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.serviceFooter}>
+                <View style={styles.priceContainer}>
+                  <Text style={styles.priceLabel}>Starting at</Text>
+                  <Text style={styles.priceText}>{service.price}</Text>
+                </View>
+                <TouchableOpacity style={styles.bookButton}>
+                  <Text style={styles.bookButtonText}>Book Now</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
         ))}
+        
+        {filteredServices.length === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateIcon}>🔍</Text>
+            <Text style={styles.emptyStateText}>No services found</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Try adjusting your search criteria
+            </Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -146,46 +192,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#DC2626',
     padding: 25,
     paddingTop: 60,
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     shadowColor: '#DC2626',
     shadowOffset: {
       width: 0,
-      height: 15,
+      height: 10,
     },
-    shadowOpacity: 0.4,
-    shadowRadius: 25,
-    elevation: 25,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 5,
   },
-  logoContainer: {
-    width: 50,
-    height: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  logo: {
-    fontSize: 24,
+  subtitle: {
+    fontSize: 14,
+    color: '#FECACA',
   },
   profileIcon: {
     width: 50,
@@ -194,6 +227,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   profileIconText: {
     fontSize: 18,
@@ -211,21 +246,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    shadowColor: '#DC2626',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 10,
   },
   searchIcon: {
     fontSize: 18,
     marginRight: 10,
-    color: '#6B7280',
   },
   searchInput: {
     flex: 1,
@@ -233,77 +265,133 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   content: {
-    padding: 25,
-    marginTop: -20,
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 20,
+    marginTop: 5,
   },
   serviceCard: {
     backgroundColor: '#fff',
-    borderRadius: 25,
+    borderRadius: 20,
     marginBottom: 20,
-    shadowColor: '#DC2626',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 15,
-    elevation: 15,
-    flexDirection: 'row',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: '#F3F4F6',
   },
   serviceImageContainer: {
-    width: 100,
-    height: 120,
+    width: '100%',
+    height: 140,
     backgroundColor: '#DC2626',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
   serviceIcon: {
-    fontSize: 40,
-  },
-  heartIcon: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-  heartText: {
-    fontSize: 16,
+    fontSize: 60,
   },
   serviceContent: {
-    flex: 1,
-    padding: 18,
+    padding: 20,
+  },
+  serviceHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  serviceTitleContainer: {
+    flex: 1,
+    marginRight: 10,
   },
   serviceTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
-    marginBottom: 5,
-  },
-  serviceLocation: {
-    fontSize: 14,
-    color: '#6B7280',
     marginBottom: 8,
   },
-  serviceDetails: {
+  categoryBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  categoryText: {
     fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 3,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  favoriteButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favoriteIcon: {
+    fontSize: 20,
+  },
+  serviceDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 15,
+  },
+  serviceMetadata: {
+    flexDirection: 'row',
+    gap: 20,
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  metadataItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metadataIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  metadataText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   serviceFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
   },
-  priceButton: {
+  priceContainer: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  priceText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#DC2626',
+  },
+  bookButton: {
     backgroundColor: '#DC2626',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 15,
     shadowColor: '#DC2626',
     shadowOffset: {
       width: 0,
@@ -313,14 +401,30 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  priceText: {
+  bookButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 15,
   },
-  rating: {
-    fontSize: 12,
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateIcon: {
+    fontSize: 60,
+    marginBottom: 15,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
     color: '#6B7280',
-    fontWeight: '600',
+    textAlign: 'center',
   },
 });
