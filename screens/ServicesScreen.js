@@ -1,77 +1,126 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { supabaseService } from '../config/supabase-simple';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ServicesScreen({ navigation }) {
+  const { userProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const services = [
-    {
-      id: 1,
-      title: 'CNC Machining',
-      description: 'Precision machining services for complex parts',
-      price: 'From $50/hour',
-      image: '🔧',
-      rating: 4.8,
-      reviews: 124,
-      category: 'Machining',
-      duration: '2-5 days',
-    },
-    {
-      id: 2,
-      title: '3D Printing',
-      description: 'Rapid prototyping and production parts',
-      price: 'From $25/hour',
-      image: '🖨️',
-      rating: 4.6,
-      reviews: 89,
-      category: 'Prototyping',
-      duration: '1-3 days',
-    },
-    {
-      id: 3,
-      title: 'Welding Services',
-      description: 'Professional welding for all materials',
-      price: 'From $40/hour',
-      image: '⚡',
-      rating: 4.7,
-      reviews: 156,
-      category: 'Fabrication',
-      duration: '1-2 days',
-    },
-    {
-      id: 4,
-      title: 'Sheet Metal Work',
-      description: 'Custom sheet metal fabrication',
-      price: 'From $35/hour',
-      image: '📐',
-      rating: 4.5,
-      reviews: 98,
-      category: 'Fabrication',
-      duration: '2-4 days',
-    },
-    {
-      id: 5,
-      title: 'Assembly Services',
-      description: 'Complete product assembly and testing',
-      price: 'From $30/hour',
-      image: '🔩',
-      rating: 4.9,
-      reviews: 203,
-      category: 'Assembly',
-      duration: '1-3 days',
-    },
-    {
-      id: 6,
-      title: 'Design Consultation',
-      description: 'Engineering design and optimization',
-      price: 'From $75/hour',
-      image: '📊',
-      rating: 4.8,
-      reviews: 67,
-      category: 'Consulting',
-      duration: '1-2 days',
-    },
-  ];
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load services from Supabase
+  useEffect(() => {
+    loadServices();
+  }, []);
+
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      const data = await supabaseService.getServices();
+      setServices(data || []);
+    } catch (err) {
+      console.error('Error loading services:', err);
+      setError('Failed to load services');
+      // Fallback to local data if Supabase fails
+      setServices([
+        {
+          id: 1,
+          title: 'CNC Machining',
+          description: 'Precision machining services for complex parts',
+          price: 'From $50/hour',
+          image: '🔧',
+          rating: 4.8,
+          reviews: 124,
+          category: 'Machining',
+          duration: '2-5 days',
+        },
+        {
+          id: 2,
+          title: '3D Printing',
+          description: 'Rapid prototyping and production parts',
+          price: 'From $25/hour',
+          image: '🖨️',
+          rating: 4.6,
+          reviews: 89,
+          category: 'Prototyping',
+          duration: '1-3 days',
+        },
+        {
+          id: 3,
+          title: 'Welding Services',
+          description: 'Professional welding for all materials',
+          price: 'From $40/hour',
+          image: '⚡',
+          rating: 4.7,
+          reviews: 156,
+          category: 'Fabrication',
+          duration: '1-2 days',
+        },
+        {
+          id: 4,
+          title: 'Sheet Metal Work',
+          description: 'Custom sheet metal fabrication',
+          price: 'From $35/hour',
+          image: '📐',
+          rating: 4.5,
+          reviews: 98,
+          category: 'Fabrication',
+          duration: '2-4 days',
+        },
+        {
+          id: 5,
+          title: 'Assembly Services',
+          description: 'Complete product assembly and testing',
+          price: 'From $30/hour',
+          image: '🔩',
+          rating: 4.9,
+          reviews: 203,
+          category: 'Assembly',
+          duration: '1-3 days',
+        },
+        {
+          id: 6,
+          title: 'Design Consultation',
+          description: 'Engineering design and optimization',
+          price: 'From $75/hour',
+          image: '📊',
+          rating: 4.8,
+          reviews: 67,
+          category: 'Consulting',
+          duration: '1-2 days',
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = async (query) => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      loadServices();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await supabaseService.searchServices(query);
+      setServices(data || []);
+    } catch (err) {
+      console.error('Error searching services:', err);
+      // Fallback to local filtering
+      const filtered = services.filter(service =>
+        service.title.toLowerCase().includes(query.toLowerCase()) ||
+        service.description.toLowerCase().includes(query.toLowerCase()) ||
+        service.category.toLowerCase().includes(query.toLowerCase())
+      );
+      setServices(filtered);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredServices = services.filter(service =>
     service.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,8 +129,7 @@ export default function ServicesScreen({ navigation }) {
   );
 
   const handleServicePress = (service) => {
-    // navigation.navigate('ServiceDetail', { service });
-    console.log('Service pressed:', service.title);
+    navigation.navigate('ServiceDetail', { service });
   };
 
   return (
@@ -93,7 +141,12 @@ export default function ServicesScreen({ navigation }) {
             <Text style={styles.subtitle}>Browse our manufacturing services</Text>
           </View>
           <View style={styles.profileIcon}>
-            <Text style={styles.profileIconText}>JD</Text>
+            <Text style={styles.profileIconText}>
+              {userProfile?.name 
+                ? userProfile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                : 'U'
+              }
+            </Text>
           </View>
         </View>
         <View style={styles.searchContainer}>
@@ -104,7 +157,7 @@ export default function ServicesScreen({ navigation }) {
               placeholder="Search services..."
               placeholderTextColor="#9CA3AF"
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={handleSearch}
             />
           </View>
         </View>
@@ -115,7 +168,25 @@ export default function ServicesScreen({ navigation }) {
           {searchQuery ? 'Search Results' : 'Available Services'} ({filteredServices.length})
         </Text>
         
-        {filteredServices.map((service) => (
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#DC2626" />
+            <Text style={styles.loadingText}>Loading services...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadServices}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredServices.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No services found</Text>
+            <Text style={styles.emptySubtext}>Try adjusting your search terms</Text>
+          </View>
+        ) : (
+          filteredServices.map((service) => (
           <TouchableOpacity 
             key={service.id} 
             style={styles.serviceCard} 
@@ -167,16 +238,7 @@ export default function ServicesScreen({ navigation }) {
               </View>
             </View>
           </TouchableOpacity>
-        ))}
-        
-        {filteredServices.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>🔍</Text>
-            <Text style={styles.emptyStateText}>No services found</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Try adjusting your search criteria
-            </Text>
-          </View>
+        ))
         )}
       </View>
     </ScrollView>
@@ -425,6 +487,53 @@ const styles = StyleSheet.create({
   emptyStateSubtext: {
     fontSize: 14,
     color: '#6B7280',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 10,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  retryButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
     textAlign: 'center',
   },
 });

@@ -1,37 +1,65 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { supabaseService } from '../config/supabase-simple';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ServiceDetailScreen({ route, navigation }) {
-  const { service } = route.params;
+  const { user } = useAuth();
+  const { service } = route.params || {};
+  
+  // Fallback service data in case navigation fails
+  const defaultService = {
+    id: 1,
+    title: 'Service Not Found',
+    description: 'Service details not available',
+    price: 'Contact for pricing',
+    image: '❓',
+    rating: 0,
+    reviews: 0,
+    category: 'Unknown',
+    duration: 'TBD',
+  };
+  
+  const serviceData = service || defaultService;
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [reviews, setReviews] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const subscriptions = [
-    {
-      id: 1,
-      name: 'Basic Plan',
-      price: '$99/month',
-      features: ['5 hours/month', 'Basic support', 'Standard materials'],
-      popular: false,
-    },
-    {
-      id: 2,
-      name: 'Professional Plan',
-      price: '$199/month',
-      features: ['15 hours/month', 'Priority support', 'Premium materials', 'Rush delivery'],
-      popular: true,
-    },
-    {
-      id: 3,
-      name: 'Enterprise Plan',
-      price: '$399/month',
-      features: ['Unlimited hours', '24/7 support', 'Custom materials', 'Dedicated team'],
-      popular: false,
-    },
-  ];
+  // Load reviews and subscriptions from Supabase
+  useEffect(() => {
+    loadReviews();
+    loadSubscriptions();
+  }, [serviceData.id]);
 
-  const reviews = [
+  const loadReviews = async () => {
+    try {
+      setLoading(true);
+      const data = await supabaseService.getReviews(serviceData.id);
+      setReviews(data || []);
+    } catch (err) {
+      console.error('Error loading reviews:', err);
+      // Fallback to mock data
+      setReviews(getMockReviews());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSubscriptions = async () => {
+    try {
+      const data = await supabaseService.getSubscriptions();
+      setSubscriptions(data || []);
+    } catch (err) {
+      console.error('Error loading subscriptions:', err);
+      // Fallback to mock data
+      setSubscriptions(getMockSubscriptions());
+    }
+  };
+
+  const getMockReviews = () => [
     {
       id: 1,
       name: 'John Smith',
@@ -55,22 +83,91 @@ export default function ServiceDetailScreen({ route, navigation }) {
     },
   ];
 
+  const getMockSubscriptions = () => [
+    {
+      id: 1,
+      name: 'Basic Plan',
+      price: '$99/month',
+      features: ['5 hours/month', 'Basic support', 'Standard materials'],
+      popular: false,
+    },
+    {
+      id: 2,
+      name: 'Professional Plan',
+      price: '$199/month',
+      features: ['15 hours/month', 'Priority support', 'Premium materials', 'Rush delivery'],
+      popular: true,
+    },
+    {
+      id: 3,
+      name: 'Enterprise Plan',
+      price: '$399/month',
+      features: ['Unlimited hours', '24/7 support', 'Custom materials', 'Dedicated team'],
+      popular: false,
+    },
+  ];
+
+
   const timeSlots = [
     '9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM',
     '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
   ];
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (!selectedDate || !selectedTime) {
       Alert.alert('Missing Information', 'Please select date and time');
       return;
     }
-    Alert.alert('Booking Confirmed', `Your ${service.title} appointment is scheduled for ${selectedDate} at ${selectedTime}`);
+
+    try {
+      setLoading(true);
+      const bookingData = {
+        user_id: user.id,
+        service_id: serviceData.id,
+        booking_date: selectedDate,
+        booking_time: selectedTime,
+        status: 'pending',
+        total_price: parseFloat(serviceData.price.replace(/[^0-9.]/g, '')),
+        notes: `Booking for ${serviceData.title}`,
+      };
+
+      await supabaseService.createBooking(bookingData);
+      Alert.alert('Booking Confirmed', `Your ${serviceData.title} appointment is scheduled for ${selectedDate} at ${selectedTime}`);
+      
+      // Reset form
+      setSelectedDate('');
+      setSelectedTime('');
+    } catch (err) {
+      console.error('Error creating booking:', err);
+      Alert.alert('Error', 'Failed to create booking. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubscription = (subscription) => {
-    setSelectedSubscription(subscription);
-    Alert.alert('Subscription Selected', `You've selected the ${subscription.name} for ${subscription.price}`);
+  const handleSubscription = async (subscription) => {
+    try {
+      setLoading(true);
+      setSelectedSubscription(subscription);
+      
+      const subscriptionData = {
+        user_id: user.id,
+        service_id: serviceData.id,
+        plan_name: subscription.name,
+        price: parseFloat(subscription.price.replace(/[^0-9.]/g, '')),
+        features: subscription.features,
+        status: 'active',
+        start_date: new Date().toISOString().split('T')[0],
+      };
+
+      await supabaseService.createSubscription(subscriptionData);
+      Alert.alert('Subscription Confirmed', `You've subscribed to the ${subscription.name} for ${subscription.price}`);
+    } catch (err) {
+      console.error('Error creating subscription:', err);
+      Alert.alert('Error', 'Failed to create subscription. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderStars = (rating) => {
@@ -92,7 +189,7 @@ export default function ServiceDetailScreen({ route, navigation }) {
       </View>
 
       <View style={styles.serviceImageContainer}>
-        <Text style={styles.serviceImage}>{service.image}</Text>
+        <Text style={styles.serviceImage}>{serviceData.image}</Text>
         <View style={styles.heartIcon}>
           <Text style={styles.heartText}>❤️</Text>
         </View>
@@ -100,21 +197,21 @@ export default function ServiceDetailScreen({ route, navigation }) {
 
       <View style={styles.content}>
         <View style={styles.serviceInfo}>
-          <Text style={styles.serviceTitle}>{service.title}</Text>
-          <Text style={styles.serviceCategory}>{service.category}</Text>
+          <Text style={styles.serviceTitle}>{serviceData.title}</Text>
+          <Text style={styles.serviceCategory}>{serviceData.category}</Text>
           <View style={styles.ratingContainer}>
-            <Text style={styles.rating}>{renderStars(service.rating)}</Text>
-            <Text style={styles.ratingText}>{service.rating} ({service.reviews} reviews)</Text>
+            <Text style={styles.rating}>{renderStars(serviceData.rating)}</Text>
+            <Text style={styles.ratingText}>{serviceData.rating} ({serviceData.reviews} reviews)</Text>
           </View>
-          <Text style={styles.price}>{service.price}</Text>
-          <Text style={styles.duration}>Duration: {service.duration}</Text>
+          <Text style={styles.price}>{serviceData.price}</Text>
+          <Text style={styles.duration}>Duration: {serviceData.duration}</Text>
         </View>
 
         <View style={styles.descriptionCard}>
           <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.description}>{service.description}</Text>
+          <Text style={styles.description}>{serviceData.description}</Text>
           <Text style={styles.detailedDescription}>
-            Our {service.title.toLowerCase()} service provides professional-grade solutions with state-of-the-art equipment and experienced technicians. We ensure precision, quality, and timely delivery for all your manufacturing needs.
+            Our {serviceData.title.toLowerCase()} service provides professional-grade solutions with state-of-the-art equipment and experienced technicians. We ensure precision, quality, and timely delivery for all your manufacturing needs.
           </Text>
         </View>
 
@@ -175,8 +272,16 @@ export default function ServiceDetailScreen({ route, navigation }) {
                 ))}
               </ScrollView>
             </View>
-            <TouchableOpacity style={styles.bookButton} onPress={handleBooking}>
-              <Text style={styles.bookButtonText}>Book Now</Text>
+            <TouchableOpacity 
+              style={[styles.bookButton, loading && styles.bookButtonDisabled]} 
+              onPress={handleBooking}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.bookButtonText}>Book Now</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -505,6 +610,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  bookButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
   },
   reviewsCard: {
     backgroundColor: '#fff',

@@ -1,9 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
+  const { userProfile } = useAuth();
+  
   const handleViewServices = () => {
     navigation.navigate('Services');
   };
@@ -24,11 +27,18 @@ export default function HomeScreen({ navigation }) {
     
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Hi, Mr. John Doe</Text>
+            <Text style={styles.greeting}>
+              Hi, {userProfile?.name ? `Mr. ${userProfile.name.split(' ')[0]}` : 'User'}
+            </Text>
           </View>
         
           <View style={styles.profileIcon}>
-            <Text style={styles.profileIconText}>JD</Text>
+            <Text style={styles.profileIconText}>
+              {userProfile?.name 
+                ? userProfile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                : 'U'
+              }
+            </Text>
           </View>
         </View>
         <View style={styles.headerContent}>

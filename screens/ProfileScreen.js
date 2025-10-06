@@ -1,119 +1,261 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileScreen() {
-  const userInfo = {
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    company: 'Tech Solutions Inc.',
-    memberSince: 'January 2024',
+  const { user, userProfile, signOut, updateProfile } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [editData, setEditData] = useState({
+    name: '',
+    phone: '',
+  });
+
+  // Initialize edit data when userProfile changes
+  React.useEffect(() => {
+    if (userProfile) {
+      setEditData({
+        name: userProfile.name || '',
+        phone: userProfile.phone || '',
+      });
+    }
+  }, [userProfile]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
   };
 
-  const handleEditProfile = () => {
-    Alert.alert('Edit Profile', 'Profile editing feature coming soon!');
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      const { error } = await updateProfile(editData);
+      
+      if (error) {
+        Alert.alert('Error', 'Failed to update profile');
+      } else {
+        Alert.alert('Success', 'Profile updated successfully');
+        setIsEditing(false);
+      }
+    } catch (err) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSettings = () => {
-    Alert.alert('Settings', 'Settings feature coming soon!');
+  const handleCancel = () => {
+    setEditData({
+      name: userProfile?.name || '',
+      phone: userProfile?.phone || '',
+    });
+    setIsEditing(false);
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive' },
-    ]);
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (err) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        },
+      ]
+    );
   };
+
+  const getInitials = (name) => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getMemberSince = (createdAt) => {
+    if (!createdAt) return 'Recently';
+    const date = new Date(createdAt);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  if (!user || !userProfile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#DC2626" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>Manage your account</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>Profile</Text>
+          </View>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      
-      <View style={styles.content}>
-        <View style={styles.profileCard}>
+
+      {/* Profile Card */}
+      <View style={styles.profileCard}>
+        <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>JD</Text>
+            <Text style={styles.avatarText}>
+              {getInitials(userProfile.name || user.email)}
+            </Text>
           </View>
-          <Text style={styles.userName}>{userInfo.name}</Text>
-          <Text style={styles.userEmail}>{userInfo.email}</Text>
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
+          {!isEditing && (
+            <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+              <Text style={styles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        <View style={styles.infoCard}>
-          <Text style={styles.cardTitle}>Account Information</Text>
-          
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Phone</Text>
-            <Text style={styles.infoValue}>{userInfo.phone}</Text>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Company</Text>
-            <Text style={styles.infoValue}>{userInfo.company}</Text>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Member Since</Text>
-            <Text style={styles.infoValue}>{userInfo.memberSince}</Text>
-          </View>
-        </View>
-
-        <View style={styles.statsCard}>
-          <Text style={styles.cardTitle}>Your Statistics</Text>
-          
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>12</Text>
-              <Text style={styles.statLabel}>Projects</Text>
+        <View style={styles.userInfo}>
+          {isEditing ? (
+            <View style={styles.editForm}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editData.name}
+                  onChangeText={(text) => setEditData({...editData, name: text})}
+                  placeholder="Enter your name"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editData.phone}
+                  onChangeText={(text) => setEditData({...editData, phone: text})}
+                  placeholder="Enter your phone number"
+                  keyboardType="phone-pad"
+                />
+              </View>
+              <View style={styles.editActions}>
+                <TouchableOpacity 
+                  style={styles.cancelButton} 
+                  onPress={handleCancel}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
+                  onPress={handleSave}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>8</Text>
-              <Text style={styles.statLabel}>Bookings</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>4.8</Text>
-              <Text style={styles.statLabel}>Rating</Text>
-            </View>
+          ) : (
+            <>
+              <Text style={styles.userName}>{userProfile.name || 'User'}</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
+              <Text style={styles.userPhone}>
+                {userProfile.phone || 'No phone number'}
+              </Text>
+              <Text style={styles.memberSince}>
+                Member since {getMemberSince(userProfile.created_at)}
+              </Text>
+            </>
+          )}
+        </View>
+      </View>
+
+      {/* Stats Card */}
+      <View style={styles.statsCard}>
+        <Text style={styles.statsTitle}>Your Activity</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Total Bookings</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
           </View>
         </View>
+      </View>
 
-        <View style={styles.menuCard}>
-          <TouchableOpacity style={styles.menuItem} onPress={handleSettings}>
-            <Text style={styles.menuText}>Settings</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Notifications</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Help & Support</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Privacy Policy</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Terms of Service</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
+      {/* Menu Items */}
+      <View style={styles.menuCard}>
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Text style={styles.menuIcon}>📋</Text>
+            <Text style={styles.menuText}>My Bookings</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Text style={styles.menuIcon}>⭐</Text>
+            <Text style={styles.menuText}>My Reviews</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Text style={styles.menuIcon}>💳</Text>
+            <Text style={styles.menuText}>Payment Methods</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Text style={styles.menuIcon}>🔔</Text>
+            <Text style={styles.menuText}>Notifications</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Text style={styles.menuIcon}>⚙️</Text>
+            <Text style={styles.menuText}>Settings</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItemLeft}>
+            <Text style={styles.menuIcon}>❓</Text>
+            <Text style={styles.menuText}>Help & Support</Text>
+          </View>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* App Info */}
+      <View style={styles.appInfo}>
+        <Text style={styles.appVersion}>Fabtech v1.0.0</Text>
+        <Text style={styles.appCopyright}>© 2024 Fabtech. All rights reserved.</Text>
       </View>
     </ScrollView>
   );
@@ -124,6 +266,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 10,
+  },
   header: {
     backgroundColor: '#DC2626',
     padding: 25,
@@ -131,143 +284,185 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     shadowColor: '#DC2626',
-    shadowOffset: {
-      width: 0,
-      height: 15,
-    },
+    shadowOffset: { width: 0, height: 15 },
     shadowOpacity: 0.4,
     shadowRadius: 25,
     elevation: 25,
   },
-  title: {
-    fontSize: 28,
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  greeting: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 5,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#FECACA',
+  logoutButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  content: {
-    padding: 20,
+  logoutButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   profileCard: {
     backgroundColor: '#fff',
+    marginHorizontal: 25,
+    marginTop: -20,
     borderRadius: 25,
-    padding: 30,
-    alignItems: 'center',
-    marginBottom: 25,
-    shadowColor: '#D32F2F',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.12,
+    padding: 25,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
     shadowRadius: 15,
-    elevation: 12,
+    elevation: 15,
     borderWidth: 1,
-    borderColor: '#FFEBEE',
+    borderColor: '#FEE2E2',
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
     backgroundColor: '#DC2626',
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    elevation: 15,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#fff',
   },
+  editButton: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  editButtonText: {
+    color: '#6B7280',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  userInfo: {
+    alignItems: 'center',
+  },
   userName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   userEmail: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 15,
+    color: '#6B7280',
+    marginBottom: 5,
+    textAlign: 'center',
   },
-  editButton: {
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 25,
-    shadowColor: '#DC2626',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  editButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  userPhone: {
     fontSize: 14,
+    color: '#9CA3AF',
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  infoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 25,
-    padding: 30,
-    marginBottom: 25,
-    shadowColor: '#D32F2F',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 15,
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: '#FFEBEE',
+  memberSince: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+  editForm: {
+    width: '100%',
+  },
+  inputGroup: {
     marginBottom: 15,
   },
-  infoRow: {
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 5,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  editActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginTop: 10,
   },
-  infoLabel: {
-    fontSize: 16,
-    color: '#666',
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginRight: 10,
   },
-  infoValue: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+  cancelButtonText: {
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#DC2626',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   statsCard: {
     backgroundColor: '#fff',
+    marginHorizontal: 25,
+    marginTop: 20,
     borderRadius: 25,
-    padding: 30,
-    marginBottom: 25,
-    shadowColor: '#D32F2F',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.12,
+    padding: 25,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
     shadowRadius: 15,
-    elevation: 12,
+    elevation: 15,
     borderWidth: 1,
-    borderColor: '#FFEBEE',
+    borderColor: '#FEE2E2',
   },
-  statsRow: {
+  statsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  statsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
@@ -278,61 +473,67 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#DC2626',
+    marginBottom: 5,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   menuCard: {
     backgroundColor: '#fff',
+    marginHorizontal: 25,
+    marginTop: 20,
     borderRadius: 25,
-    marginBottom: 25,
-    shadowColor: '#D32F2F',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.12,
+    padding: 20,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
     shadowRadius: 15,
-    elevation: 12,
+    elevation: 15,
     borderWidth: 1,
-    borderColor: '#FFEBEE',
-    overflow: 'hidden',
+    borderColor: '#FEE2E2',
   },
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#F3F4F6',
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuIcon: {
+    fontSize: 20,
+    marginRight: 15,
   },
   menuText: {
     fontSize: 16,
-    color: '#333',
+    color: '#1F2937',
+    fontWeight: '500',
   },
   menuArrow: {
     fontSize: 20,
-    color: '#ccc',
+    color: '#9CA3AF',
   },
-  logoutButton: {
-    backgroundColor: '#f44336',
-    padding: 18,
-    borderRadius: 25,
+  appInfo: {
     alignItems: 'center',
-    shadowColor: '#f44336',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    marginTop: 30,
+    marginBottom: 20,
+    paddingHorizontal: 25,
   },
-  logoutButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  appVersion: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 5,
+  },
+  appCopyright: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
 });

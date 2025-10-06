@@ -1,17 +1,48 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { supabaseService } from '../config/supabase-simple';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function BookingsScreen() {
+  const { user, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('current');
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const currentBookings = [
+  // Load bookings from Supabase
+  useEffect(() => {
+    loadBookings();
+  }, []);
+
+  const loadBookings = async () => {
+    try {
+      setLoading(true);
+      if (!user) {
+        setBookings([]);
+        return;
+      }
+      
+      const data = await supabaseService.getBookings(user.id);
+      setBookings(data || []);
+    } catch (err) {
+      console.error('Error loading bookings:', err);
+      setError('Failed to load bookings');
+      // Fallback to local data
+      setBookings(getMockBookings());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getMockBookings = () => [
     {
       id: 1,
       service: 'CNC Machining',
       image: '🔧',
       date: 'Oct 10, 2024',
       time: '2:00 PM',
-      status: 'Confirmed',
+      status: 'confirmed',
       price: '$250',
       rating: 4.8,
       floor: '2nd Floor',
@@ -23,82 +54,141 @@ export default function BookingsScreen() {
       image: '⚡',
       date: 'Oct 12, 2024',
       time: '3:00 PM',
-      status: 'In Progress',
+      status: 'in-progress',
       price: '$320',
       rating: 4.7,
       floor: '1st Floor',
       room: 'B01',
     },
-  ];
-
-  const orderHistory = [
     {
-      id: 1,
+      id: 3,
       service: '3D Printing',
       image: '🖨️',
       date: 'Oct 8, 2024',
       time: '10:00 AM',
-      status: 'Completed',
+      status: 'completed',
       price: '$180',
       rating: 4.6,
       floor: '2nd Floor',
       room: 'A03',
     },
     {
-      id: 2,
+      id: 4,
       service: 'Sheet Metal Work',
       image: '🔨',
       date: 'Oct 5, 2024',
       time: '1:00 PM',
-      status: 'Completed',
+      status: 'completed',
       price: '$420',
       rating: 4.9,
       floor: '1st Floor',
       room: 'A01',
     },
-    {
-      id: 3,
-      service: 'Assembly Services',
-      image: '⚙️',
-      date: 'Oct 2, 2024',
-      time: '11:00 AM',
-      status: 'Completed',
-      price: '$290',
-      rating: 4.5,
-      floor: '2nd Floor',
-      room: 'B02',
-    },
-    {
-      id: 4,
-      service: 'Design Consultation',
-      image: '📐',
-      date: 'Sep 28, 2024',
-      time: '9:00 AM',
-      status: 'Completed',
-      price: '$150',
-      rating: 4.8,
-      floor: '3rd Floor',
-      room: 'C01',
-    },
   ];
 
+  // Filter bookings based on active tab
+  const currentBookings = bookings.filter(booking => 
+    booking.status === 'confirmed' || booking.status === 'in-progress'
+  );
+  const orderHistory = bookings.filter(booking => 
+    booking.status === 'completed' || booking.status === 'cancelled'
+  );
+
   const bookingsToShow = activeTab === 'current' ? currentBookings : orderHistory;
+
+  const getStatusColor = (status) => {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return '#10B981';
+      case 'in-progress':
+        return '#F59E0B';
+      case 'completed':
+        return '#3B82F6';
+      case 'cancelled':
+        return '#EF4444';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Confirmed';
+      case 'in-progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  };
+
+  const handleBookingAction = async (bookingId, action) => {
+    try {
+      if (action === 'cancel') {
+        await supabaseService.updateBooking(bookingId, { status: 'cancelled' });
+        Alert.alert('Success', 'Booking cancelled successfully');
+      } else if (action === 'reschedule') {
+        Alert.alert('Reschedule', 'Reschedule functionality coming soon');
+      }
+      loadBookings(); // Reload bookings
+    } catch (err) {
+      console.error('Error updating booking:', err);
+      Alert.alert('Error', 'Failed to update booking');
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#DC2626" />
+        <Text style={styles.loadingText}>Loading bookings...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadBookings}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Bookings</Text>
-        <Text style={styles.headerSubtitle}>Track your manufacturing services</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>
+              Hi, {userProfile?.name ? `Mr. ${userProfile.name.split(' ')[0]}` : 'User'}
+            </Text>
+          </View>
+          <View style={styles.profileIcon}>
+            <Text style={styles.profileIconText}>
+              {userProfile?.name 
+                ? userProfile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                : 'U'
+              }
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'current' && styles.tabActive]}
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'current' && styles.activeTab]}
           onPress={() => setActiveTab('current')}
         >
-          <Text style={[styles.tabText, activeTab === 'current' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, activeTab === 'current' && styles.activeTabText]}>
             Current Bookings
           </Text>
           <View style={styles.tabBadge}>
@@ -106,11 +196,11 @@ export default function BookingsScreen() {
           </View>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'history' && styles.activeTab]}
           onPress={() => setActiveTab('history')}
         >
-          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+          <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
             Order History
           </Text>
           <View style={styles.tabBadge}>
@@ -120,97 +210,70 @@ export default function BookingsScreen() {
       </View>
 
       {/* Bookings List */}
-      <View style={styles.bookingsContainer}>
-        {bookingsToShow.map((booking) => (
-          <View key={booking.id} style={styles.bookingCard}>
-            {/* Booking Header */}
-            <View style={styles.bookingHeader}>
-              <View style={styles.bookingImageContainer}>
-                <Text style={styles.bookingImage}>{booking.image}</Text>
-              </View>
-              
-              <View style={styles.bookingHeaderContent}>
-                <Text style={styles.bookingService}>{booking.service}</Text>
-                <Text style={styles.locationText}>
-                  📍 {booking.floor} • Room {booking.room}
-                </Text>
-              </View>
-              
-              <View style={[
-                styles.bookingStatusBadge,
-                booking.status === 'Completed' && styles.statusCompleted,
-                booking.status === 'In Progress' && styles.statusInProgress,
-                booking.status === 'Confirmed' && styles.statusConfirmed,
-              ]}>
-                <Text style={[
-                  styles.bookingStatusText,
-                  booking.status === 'Completed' && styles.statusCompletedText,
-                  booking.status === 'In Progress' && styles.statusInProgressText,
-                  booking.status === 'Confirmed' && styles.statusConfirmedText,
-                ]}>
-                  {booking.status}
-                </Text>
-              </View>
-            </View>
-
-            {/* Divider */}
-            <View style={styles.bookingDivider} />
-
-            {/* Booking Details */}
-            <View style={styles.bookingDetails}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Date</Text>
-                <Text style={styles.detailValue}>{booking.date}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>{booking.time}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Price</Text>
-                <Text style={styles.detailValuePrice}>{booking.price}</Text>
-              </View>
-            </View>
-
-            {/* Rating (for completed orders) */}
-            {booking.status === 'Completed' && (
-              <View style={styles.ratingContainer}>
-                <Text style={styles.ratingLabel}>Your Rating:</Text>
-                <Text style={styles.ratingValue}>⭐ {booking.rating}</Text>
-              </View>
-            )}
-
-            {/* Action Buttons */}
-            {activeTab === 'current' && (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity style={styles.actionButtonSecondary}>
-                  <Text style={styles.actionButtonSecondaryText}>View Details</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButtonPrimary}>
-                  <Text style={styles.actionButtonPrimaryText}>Contact Support</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {activeTab === 'history' && (
-              <TouchableOpacity style={styles.rebookButton}>
-                <Text style={styles.rebookButtonText}>Book Again</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
-
-        {/* Empty State */}
-        {bookingsToShow.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>📋</Text>
-            <Text style={styles.emptyStateText}>No bookings found</Text>
-            <Text style={styles.emptyStateSubtext}>
+      <View style={styles.content}>
+        {bookingsToShow.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {activeTab === 'current' ? 'No current bookings' : 'No order history'}
+            </Text>
+            <Text style={styles.emptySubtext}>
               {activeTab === 'current' 
-                ? 'You have no active bookings at the moment'
-                : 'Your order history is empty'}
+                ? 'Your upcoming appointments will appear here' 
+                : 'Your completed orders will appear here'
+              }
             </Text>
           </View>
+        ) : (
+          bookingsToShow.map((booking) => (
+            <View key={booking.id} style={styles.bookingCard}>
+              <View style={styles.bookingHeader}>
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceIcon}>{booking.image}</Text>
+                  <View style={styles.serviceDetails}>
+                    <Text style={styles.serviceName}>{booking.service}</Text>
+                    <Text style={styles.bookingDateTime}>
+                      {booking.date} • {booking.time}
+                    </Text>
+                    <Text style={styles.bookingLocation}>
+                      {booking.floor} • Room {booking.room}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.bookingStatus}>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(booking.status) }]}>
+                    <Text style={styles.statusText}>{getStatusText(booking.status)}</Text>
+                  </View>
+                  <Text style={styles.bookingPrice}>{booking.price}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.bookingFooter}>
+                <View style={styles.ratingContainer}>
+                  <Text style={styles.ratingStars}>
+                    {'⭐'.repeat(Math.floor(booking.rating))}
+                  </Text>
+                  <Text style={styles.ratingText}>{booking.rating}</Text>
+                </View>
+                
+                {activeTab === 'current' && booking.status !== 'completed' && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleBookingAction(booking.id, 'reschedule')}
+                    >
+                      <Text style={styles.actionButtonText}>Reschedule</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.cancelButton]}
+                      onPress={() => handleBookingAction(booking.id, 'cancel')}
+                    >
+                      <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))
         )}
       </View>
     </ScrollView>
@@ -222,252 +285,252 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 10,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#DC2626',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  retryButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   header: {
     backgroundColor: '#DC2626',
-    paddingHorizontal: 25,
+    padding: 25,
     paddingTop: 60,
-    paddingBottom: 30,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.4,
+    shadowRadius: 25,
+    elevation: 25,
   },
-  headerTitle: {
-    fontSize: 32,
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  greeting: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 5,
   },
-  headerSubtitle: {
+  profileIcon: {
+    width: 45,
+    height: 45,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 22.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  profileIconText: {
     fontSize: 16,
-    color: '#FECACA',
+    color: '#fff',
+    fontWeight: 'bold',
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginTop: -15,
-    borderRadius: 15,
+    marginHorizontal: 25,
+    marginTop: -20,
+    borderRadius: 25,
     padding: 5,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 15,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'center',
+    paddingVertical: 15,
     paddingHorizontal: 10,
-    borderRadius: 10,
+    borderRadius: 20,
   },
-  tabActive: {
+  activeTab: {
     backgroundColor: '#DC2626',
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
     marginRight: 8,
   },
-  tabTextActive: {
+  activeTabText: {
     color: '#fff',
   },
   tabBadge: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
-    minWidth: 24,
-    alignItems: 'center',
   },
   tabBadgeText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#1F2937',
+    color: '#fff',
   },
-  bookingsContainer: {
-    padding: 20,
+  content: {
+    padding: 25,
+    marginTop: 20,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   bookingCard: {
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 25,
     padding: 20,
-    marginBottom: 15,
+    marginBottom: 20,
     shadowColor: '#DC2626',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 15,
     borderWidth: 1,
     borderColor: '#FEE2E2',
   },
   bookingHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 15,
   },
-  bookingImageContainer: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#DC2626',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  bookingImage: {
-    fontSize: 30,
-  },
-  bookingHeaderContent: {
+  serviceInfo: {
+    flexDirection: 'row',
     flex: 1,
   },
-  bookingService: {
+  serviceIcon: {
+    fontSize: 32,
+    marginRight: 15,
+  },
+  serviceDetails: {
+    flex: 1,
+  },
+  serviceName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 5,
   },
-  locationText: {
-    fontSize: 13,
+  bookingDateTime: {
+    fontSize: 14,
     color: '#6B7280',
+    marginBottom: 2,
   },
-  bookingStatusBadge: {
+  bookingLocation: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  bookingStatus: {
+    alignItems: 'flex-end',
+  },
+  statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 15,
+    marginBottom: 8,
   },
-  bookingStatusText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  statusCompleted: {
-    backgroundColor: '#D1FAE5',
-  },
-  statusCompletedText: {
-    color: '#065F46',
-  },
-  statusInProgress: {
-    backgroundColor: '#FEF3C7',
-  },
-  statusInProgressText: {
-    color: '#92400E',
-  },
-  statusConfirmed: {
-    backgroundColor: '#DBEAFE',
-  },
-  statusConfirmedText: {
-    color: '#1E40AF',
-  },
-  bookingDivider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginBottom: 15,
-  },
-  bookingDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  detailItem: {
-    flex: 1,
-  },
-  detailLabel: {
+  statusText: {
     fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    color: '#fff',
   },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  detailValuePrice: {
+  bookingPrice: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#DC2626',
   },
+  bookingFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 15,
   },
-  ratingLabel: {
+  ratingStars: {
     fontSize: 14,
-    color: '#92400E',
-    marginRight: 10,
+    marginRight: 5,
   },
-  ratingValue: {
+  ratingText: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#92400E',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 10,
   },
-  actionButtonSecondary: {
-    flex: 1,
+  actionButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 15,
+    marginLeft: 10,
     backgroundColor: '#F3F4F6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
   },
-  actionButtonSecondaryText: {
-    fontSize: 14,
+  actionButtonText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#1F2937',
-  },
-  actionButtonPrimary: {
-    flex: 1,
-    backgroundColor: '#DC2626',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  actionButtonPrimaryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  rebookButton: {
-    backgroundColor: '#DC2626',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  rebookButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyStateIcon: {
-    fontSize: 60,
-    marginBottom: 15,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
     color: '#6B7280',
-    textAlign: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#FEE2E2',
+  },
+  cancelButtonText: {
+    color: '#DC2626',
   },
 });
